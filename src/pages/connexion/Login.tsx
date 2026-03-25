@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaEye } from "react-icons/fa";
 import { FaEyeSlash } from "react-icons/fa";
-import { API_BASE_URL } from "../../config";
+import { login } from "../../API/authentification";
 
 function setCookie(name: string, value: string, maxAgeSeconds = 60 * 60 * 24 * 7) {
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -29,24 +29,7 @@ export function Login() {
     setStatus("loading");
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("username", email);
-      formData.append("password", password);
-      const res = await fetch(`${API_BASE_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData,
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        let message = "Identifiants invalides."
-        if (data?.detail) message = data.detail
-        setError(message)
-        setStatus("error");
-        return;
-      }
+      const data = await login(email, password);
 
       if (data?.access_token) {
         setCookie("token", data.access_token);
@@ -58,8 +41,10 @@ export function Login() {
 
       setStatus("success");
       navigate("/app");
-    } catch {
+    } catch (err) {
       setStatus("error");
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de la connexion.";
+      setError(errorMessage);
     }
   }
 
