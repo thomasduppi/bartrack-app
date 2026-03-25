@@ -1,38 +1,26 @@
 import { useEffect, useState } from "react";
 import { FaCheck } from "react-icons/fa";
-import { API_BASE_URL } from "../config";
+import { getAllExercices } from "../API/exercices";
+import { getProfilVbt } from "../API/profil_vbt";
+import { createRm1User } from "../API/calculations";
 
 type Exercice = {
-  id_exercice?: number | string;
-  nom_exercice?: string;
-  nom?: string;
-  libelle?: string;
-  [key: string]: unknown;
+  id_exercice: number;
+  nom: string;
 };
 
 type ProfilVbtEntry = {
-  id_exercice?: number | string;
-  current_1rm?: number | string;
-  [key: string]: unknown;
-};
-
-
-
-function getCookie(name: string) {
-  const encodedName = `${encodeURIComponent(name)}=`;
-  const parts = document.cookie.split(";").map((part) => part.trim());
-  const match = parts.find((part) => part.startsWith(encodedName));
-  if (!match) return "";
-  return decodeURIComponent(match.slice(encodedName.length));
+  id_utilisateur: number;
+  id_exercice: number;
+  current_1rm: number;
+  slope: number;
+  intercept: number;
+  last_updated: string;
 }
 
+
 function getExerciceLabel(exercice: Exercice, index: number) {
-  return (
-    (typeof exercice.nom_exercice === "string" && exercice.nom_exercice) ||
-    (typeof exercice.nom === "string" && exercice.nom) ||
-    (typeof exercice.libelle === "string" && exercice.libelle) ||
-    `Exercice ${index + 1}`
-  );
+  return exercice.nom || `Exercice ${index + 1}`;
 }
 
 function getExerciceKey(exercice: Exercice, index: number) {
@@ -40,19 +28,6 @@ function getExerciceKey(exercice: Exercice, index: number) {
     return String(exercice.id_exercice);
   }
   return `${getExerciceLabel(exercice, index)}-${index}`;
-}
-
-function extractArrayPayload(value: unknown) {
-  if (Array.isArray(value)) return value;
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "data" in value &&
-    Array.isArray((value as { data?: unknown }).data)
-  ) {
-    return (value as { data: unknown[] }).data;
-  }
-  return [];
 }
 
 function buildOneRmMap(exercicesList: Exercice[], profilVbtList: ProfilVbtEntry[]) {
@@ -91,48 +66,13 @@ export function ListExercices() {
       setStatus("loading");
       setError("");
 
-      const token = getCookie("token");
-      if (!token) {
-        if (isMounted) {
-          setStatus("error");
-          setError("Session invalide. Reconnectez-vous.");
-        }
-        return;
-      }
-
       try {
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        };
-
-        const [exercicesRes, profilVbtRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/exercices`, {
-            method: "GET",
-            headers,
-          }),
-          fetch(`${API_BASE_URL}/profil_vbt`, {
-            method: "GET",
-            headers,
-          }),
+        const [exercicesList, profilVbtList] = await Promise.all([
+          getAllExercices(),
+          getProfilVbt(),
         ]);
 
-        const exercicesData = await exercicesRes.json().catch(() => null);
-        if (!exercicesRes.ok) {
-          const message =
-            typeof exercicesData?.detail === "string" ? exercicesData.detail : "Impossible de charger les exercices.";
-          throw new Error(message);
-        }
-
         if (isMounted) {
-          const exercicesList = extractArrayPayload(exercicesData) as Exercice[];
-          let profilVbtList: ProfilVbtEntry[] = [];
-
-          if (profilVbtRes.ok) {
-            const profilVbtData = await profilVbtRes.json().catch(() => null);
-            profilVbtList = extractArrayPayload(profilVbtData) as ProfilVbtEntry[];
-          }
-
           setExercices(exercicesList);
           setOneRmByExercice(buildOneRmMap(exercicesList, profilVbtList));
           setStatus("success");
@@ -155,13 +95,6 @@ export function ListExercices() {
     setSaveStatusByExercice((prev) => ({ ...prev, [key]: "loading" }));
     setSaveErrorByExercice((prev) => ({ ...prev, [key]: "" }));
 
-    const token = getCookie("token");
-    if (!token) {
-      setSaveStatusByExercice((prev) => ({ ...prev, [key]: "error" }));
-      setSaveErrorByExercice((prev) => ({ ...prev, [key]: "Session invalide. Reconnectez-vous." }));
-      return;
-    }
-
     const exerciceId = Number(exercice.id_exercice);
     const currentOneRm = Number(oneRmByExercice[key]);
 
@@ -178,23 +111,10 @@ export function ListExercices() {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/rm1_users`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id_exercice: exerciceId,
-          current_1rm: currentOneRm,
-        }),
+      await createRm1User({
+        id_exercice: exerciceId,
+        current_1rm: currentOneRm,
       });
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        const message = typeof data?.detail === "string" ? data.detail : "Impossible d'enregistrer le 1RM.";
-        throw new Error(message);
-      }
 
       setSaveStatusByExercice((prev) => ({ ...prev, [key]: "success" }));
     } catch (err) {
