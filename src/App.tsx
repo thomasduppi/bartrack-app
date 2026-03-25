@@ -7,6 +7,7 @@ import { PerformancePage } from './pages/app/Performance'
 import { ComptePage } from './pages/app/Compte'
 import { EntrainementPage } from './pages/app/Entrainement'
 import { ProgrammeCreerPage } from './pages/app/ProgrammeCreer'
+import { AddExercices } from './pages/app/AddExercices'
 import { Header } from './components/Header'
 import { BottomNav } from './components/BottomNav'
 import { Login } from './pages/connexion/Login'
@@ -29,6 +30,7 @@ function AppLayout() {
         <Route path="/app/seance" element={<SeancePage />} />
         <Route path="/app/entrainement" element={<EntrainementPage />} />
         <Route path="/app/programme/creer" element={<ProgrammeCreerPage />} />
+        <Route path="/app/add-exercices" element={<AddExercices />} />
         <Route path="/app/historique" element={<HistoriquePage />} />
         <Route path="/app/performance" element={<PerformancePage />} />
         <Route path="/app/compte" element={<ComptePage />} />
