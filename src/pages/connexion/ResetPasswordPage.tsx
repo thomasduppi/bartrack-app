@@ -37,7 +37,7 @@ export function ResetPasswordPage() {
             }
 
             setStatus("done");
-            setTimeout(() => navigate("/login"), 800);
+            setTimeout(() => navigate("/app/login"), 800);
         } catch {
             setStatus("error");
             setError("Lien invalide ou expiré. Redemande un nouveau lien.");

@@ -156,7 +156,7 @@ export function ComptePage() {
             <p className="mb-4">{error}</p>
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/app/login")}
               className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-white/10"
             >
               Aller à la connexion

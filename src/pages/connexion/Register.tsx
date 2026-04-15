@@ -115,14 +115,14 @@ export function RegisterPage() {
         sexe: gender,
       });
 
-      navigate("/login");
+      navigate("/app/login");
     } catch (err) {
       setStatus("error");
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de l'inscription.";
       setError(errorMessage);
     } finally {
       setStatus("idle");
-      navigate("/login");
+      navigate("/app/login");
     }
   }
 
@@ -362,7 +362,7 @@ export function RegisterPage() {
 
               <div className="pt-2 text-center text-sm text-white/65">
                 Déjà un compte ?{" "}
-                <Link to="/login" className="text-cyan-200/90 hover:text-cyan-200 hover:underline">
+                <Link to="/app/login" className="text-cyan-200/90 hover:text-cyan-200 hover:underline">
                   Se connecter
                 </Link>
               </div>

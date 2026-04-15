@@ -1,29 +1,31 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getAllExercices } from "../../API/exercices";
-import { FaCheck, FaArrowLeft } from "react-icons/fa";
+import { FaCheck, FaArrowLeft, FaSpinner } from "react-icons/fa";
 
 export interface Exercice {
   id_exercice: number;
   nom: string;
 }
 
+interface AddExercicesNavigationState {
+  selectedExercices?: number[];
+  draftTitle?: string;
+  draftNote?: string;
+  programmeId?: number;
+}
+
 export function AddExercices() {
   const navigate = useNavigate();
   const location = useLocation();
+  const navigationState = (location.state as AddExercicesNavigationState | null) ?? null;
   
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [exercices, setExercices] = useState<Exercice[]>([]);
-  const [selectedExercices, setSelectedExercices] = useState<number[]>([]);
-
-  // Load initial selected exercices from location state if available
-  useEffect(() => {
-    const state = location.state as { selectedExercices?: number[] } | null;
-    if (state?.selectedExercices) {
-      setSelectedExercices(state.selectedExercices);
-    }
-  }, [location.state]);
+  const [selectedExercices, setSelectedExercices] = useState<number[]>(
+    navigationState?.selectedExercices ?? []
+  );
 
   // Load exercices
   useEffect(() => {
@@ -63,7 +65,12 @@ export function AddExercices() {
 
   function handleValidate() {
     navigate("/app/programme/creer", {
-      state: { selectedExercices },
+      state: {
+        selectedExercices,
+        draftTitle: navigationState?.draftTitle ?? "",
+        draftNote: navigationState?.draftNote ?? "",
+        programmeId: navigationState?.programmeId,
+      },
     });
   }
 
@@ -93,7 +100,10 @@ export function AddExercices() {
 
         {/* Loading */}
         {status === "loading" ? (
-          <p className="text-sm text-white/45">Chargement des exercices…</p>
+          <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+            <FaSpinner className="text-cyan-300 animate-spin" />
+            <p className="animate-pulse">Chargement des exercices...</p>
+          </div>
         ) : null}
 
         {/* Error */}

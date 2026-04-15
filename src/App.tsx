@@ -17,9 +17,19 @@ import { ResetPasswordPage } from './pages/connexion/ResetPasswordPage'
 import { Test } from './pages/Test'
 
 function AppLayout() {
-  const { pathname } = useLocation()
-  const showHeader = !pathname.startsWith('/app')
-  const showBottomNav = pathname.startsWith('/app')
+  const { pathname } = useLocation();
+  const showHeader = !pathname.startsWith('/app');
+  const showBottomNav = pathname.startsWith('/app') && (pathname !== '/app/login' && pathname !== '/app/register' && pathname !== '/app/forgot-password' && pathname !== '/app/reset-password');
+  const isUserLoggedIn = !!localStorage.getItem('token');
+
+  // Rediriger vers la page de connexion si l'utilisateur n'est pas connecté et essaie d'accéder à une page protégée
+  if (!isUserLoggedIn && pathname.startsWith('/app') && !pathname.startsWith('/app/login') && !pathname.startsWith('/app/register') && !pathname.startsWith('/app/forgot-password') && !pathname.startsWith('/app/reset-password')) {
+    return <Navigate to="/app/login" replace />;
+  }
+
+  if (isUserLoggedIn && (pathname === '/app/login' || pathname === '/app/register' || pathname === '/app/forgot-password' || pathname === '/app/reset-password')) {
+    return <Navigate to="/app/seance" replace />;
+  }
 
   return (
     <div className={["min-h-screen bg-black m-0 p-0", showBottomNav ? "pb-20" : "pb-0"].join(" ")}>
@@ -34,10 +44,10 @@ function AppLayout() {
         <Route path="/app/historique" element={<HistoriquePage />} />
         <Route path="/app/performance" element={<PerformancePage />} />
         <Route path="/app/compte" element={<ComptePage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/app/login" element={<Login />} />
+        <Route path="/app/register" element={<RegisterPage />} />
+        <Route path="/app/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/app/reset-password" element={<ResetPasswordPage />} />
         <Route path='/test' element={<Test />} />
       </Routes>
       {showBottomNav ? <BottomNav /> : null}

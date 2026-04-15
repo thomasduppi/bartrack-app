@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getAllExercices } from "../../API/exercices";
-import { createProgramme } from "../../API/programmes";
-import { FaTrash, FaPlus, FaTimes } from "react-icons/fa";
+import { createProgramme, updateProgrammeFull } from "../../API/programmes";
+import { FaTrash, FaPlus, FaTimes, FaArrowUp, FaArrowDown, FaSpinner } from "react-icons/fa";
 
 interface Exercice {
   id_exercice: number;
@@ -20,26 +20,57 @@ interface ExerciceData {
   series: Serie[];
 }
 
+interface DraftExerciceForNavigation {
+  id_exercice: number;
+  ordre_passage: number;
+  nombre_series: number;
+  nombre_reps: number;
+  charge_prevue: number;
+  rpe_cible: number;
+}
+
+interface ProgrammeCreerNavigationState {
+  selectedExercices?: number[];
+  draftExercices?: DraftExerciceForNavigation[];
+  draftTitle?: string;
+  draftNote?: string;
+  programmeId?: number;
+}
+
 export function ProgrammeCreerPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const navigationState = (location.state as ProgrammeCreerNavigationState | null) ?? null;
+  const isEditMode = typeof navigationState?.programmeId === "number";
 
-  const [titreProgramme, setTitreProgramme] = useState("");
-  const [noteProgramme, setNoteProgramme] = useState("");
+  const [titreProgramme, setTitreProgramme] = useState(
+    navigationState?.draftTitle ?? ""
+  );
+  const [noteProgramme, setNoteProgramme] = useState(
+    navigationState?.draftNote ?? ""
+  );
   const [exercicesData, setExercicesData] = useState<ExerciceData[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const state = location.state as { selectedExercices?: number[] } | null;
-    if (state?.selectedExercices && state.selectedExercices.length > 0) {
-      loadExercices(state.selectedExercices);
+    if (navigationState?.selectedExercices && navigationState.selectedExercices.length > 0) {
+      loadExercices(
+        navigationState.selectedExercices,
+        navigationState.draftExercices
+      );
     }
-  }, [location.state]);
+  }, [navigationState?.selectedExercices, navigationState?.draftExercices]);
 
-  async function loadExercices(ids: number[]) {
+  async function loadExercices(
+    ids: number[],
+    draftExercices?: DraftExerciceForNavigation[]
+  ) {
     try {
       setLoading(true);
       const tousLesExercices = await getAllExercices();
+      const draftByExerciceId = new Map<number, DraftExerciceForNavigation>(
+        (draftExercices ?? []).map((draft) => [draft.id_exercice, draft])
+      );
       // Preserve the order of selection by mapping ids in order
       const exercicesSelectionnees = ids
         .map(id => tousLesExercices.find(ex => ex.id_exercice === id))
@@ -51,9 +82,17 @@ export function ProgrammeCreerPage() {
 
         exercicesSelectionnees.forEach((ex) => {
           if (!existingIds.has(ex.id_exercice)) {
+            const draft = draftByExerciceId.get(ex.id_exercice);
+            const nombreSeries = Math.max(1, draft?.nombre_series ?? 1);
+            const series = Array.from({ length: nombreSeries }, (_, index) => ({
+              id: `${ex.id_exercice}-${index + 1}`,
+              kg: draft?.charge_prevue ?? 0,
+              reps: draft?.nombre_reps ?? 0,
+            }));
+
             nouvelleList.push({
               exercice: ex,
-              series: [{ id: `${ex.id_exercice}-1`, kg: 0, reps: 0 }],
+              series,
             });
           }
         });
@@ -71,6 +110,20 @@ export function ProgrammeCreerPage() {
     setExercicesData((prev) =>
       prev.filter((ex) => ex.exercice.id_exercice !== id)
     );
+  }
+
+  function deplacerExercice(index: number, direction: "up" | "down") {
+    setExercicesData((prev) => {
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+
+      const next = [...prev];
+      const [movedExercice] = next.splice(index, 1);
+      next.splice(targetIndex, 0, movedExercice);
+      return next;
+    });
   }
 
   function ajouterSerie(exerciceId: number) {
@@ -151,8 +204,6 @@ export function ProgrammeCreerPage() {
 
     try {
       setLoading(true);
-
-      // Construire l'array des exercices pour le nouveau endpoint
       const exercices = exercicesData.map((exData, index) => {
         const firstSerie = exData.series[0];
         return {
@@ -165,23 +216,37 @@ export function ProgrammeCreerPage() {
         };
       });
 
-      await createProgramme({
-        nom_programme: titreProgramme,
-        description: noteProgramme,
-        exercices,
-      });
+      if (isEditMode && navigationState?.programmeId) {
+        await updateProgrammeFull(navigationState.programmeId, {
+          nom_programme: titreProgramme,
+          description: noteProgramme,
+          exercices,
+        });
+      } else {
+        await createProgramme({
+          nom_programme: titreProgramme,
+          description: noteProgramme,
+          exercices,
+        });
+      }
 
-      // Réinitialiser le formulaire
       setTitreProgramme("");
       setNoteProgramme("");
       setExercicesData([]);
       navigate("/app/seance");
     } catch (error) {
-      console.error("Erreur lors de la création du programme:", error);
+      console.error(
+        isEditMode
+          ? "Erreur lors de la modification du programme:"
+          : "Erreur lors de la creation du programme:",
+        error
+      );
       alert(
         error instanceof Error
           ? error.message
-          : "Erreur lors de la création du programme"
+          : isEditMode
+            ? "Erreur lors de la modification du programme"
+            : "Erreur lors de la creation du programme"
       );
     } finally {
       setLoading(false);
@@ -190,7 +255,7 @@ export function ProgrammeCreerPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-10 text-white">
-      <h1 className="text-3xl font-bold">Creer un programme</h1>
+      <h1 className="text-3xl font-bold">Créer un programme</h1>
 
       <div className="mt-8 space-y-6 rounded-2xl p-6">
         <div className="space-y-2">
@@ -223,12 +288,15 @@ export function ProgrammeCreerPage() {
       </div>
 
       {loading && (
-        <p className="mt-4 text-sm text-white/45">Chargement des exercices…</p>
+        <div className="mt-4 flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/60">
+          <FaSpinner className="text-cyan-300 animate-spin" />
+          <p className="animate-pulse">Chargement...</p>
+        </div>
       )}
 
       {exercicesData.length > 0 && (
         <section className="mt-4 space-y-6">
-          {exercicesData.map((exData) => {
+          {exercicesData.map((exData, index) => {
             const poidsTotal = calculerPoidsTotal(exData.series);
 
             const gridClass =
@@ -249,14 +317,36 @@ export function ProgrammeCreerPage() {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => supprimerExercice(exData.exercice.id_exercice)}
-                    className="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/30 bg-red-500/10 text-red-300 transition hover:bg-red-500/20"
-                    aria-label="Supprimer cet exercice"
-                  >
-                    <FaTrash className="text-sm" />
-                  </button>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => deplacerExercice(index, "up")}
+                      disabled={index === 0}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Monter cet exercice"
+                    >
+                      <FaArrowUp className="text-sm" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deplacerExercice(index, "down")}
+                      disabled={index === exercicesData.length - 1}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Descendre cet exercice"
+                    >
+                      <FaArrowDown className="text-sm" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => supprimerExercice(exData.exercice.id_exercice)}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/30 bg-red-500/10 text-red-300 transition hover:bg-red-500/20"
+                      aria-label="Supprimer cet exercice"
+                    >
+                      <FaTrash className="text-sm" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -339,7 +429,12 @@ export function ProgrammeCreerPage() {
         type="button"
         onClick={() =>
           navigate("/app/add-exercices", {
-            state: { selectedExercices: exercicesData.map((e) => e.exercice.id_exercice) },
+            state: {
+              selectedExercices: exercicesData.map((e) => e.exercice.id_exercice),
+              draftTitle: titreProgramme,
+              draftNote: noteProgramme,
+              programmeId: navigationState?.programmeId,
+            },
           })
         }
         className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/25"
@@ -348,18 +443,36 @@ export function ProgrammeCreerPage() {
         Ajouter des exercices
       </button>
 
-      {exercicesData.length > 0 && (
-        <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={() => navigate("/app/seance")}
+          className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 font-semibold text-white/80 transition hover:bg-white/10"
+        >
+          Annuler
+        </button>
+
+        {exercicesData.length > 0 && (
           <button
             type="button"
             onClick={handleCreateProgramme}
             disabled={loading}
             className="flex-1 rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-4 py-3 font-semibold text-cyan-300 transition hover:bg-cyan-500/25 disabled:opacity-50"
           >
-            {loading ? "Création en cours..." : "Créer le programme"}
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <FaSpinner className="animate-spin" />
+                {isEditMode ? "Modification en cours..." : "Création en cours..."}
+              </span>
+            ) : (
+              isEditMode ? "Modifier le programme" : "Créer le programme"
+            )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }
+
+
+

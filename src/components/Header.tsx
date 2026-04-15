@@ -11,7 +11,7 @@ export function Header() {
         <Link to="/app/seance" className="text-[#5ce1e6] transition-colors text-lg font-medium">
           App
         </Link>
-        <Link to="/login" className="text-[#5ce1e6] transition-colors text-4xl">
+        <Link to="/app/login" className="text-[#5ce1e6] transition-colors text-4xl">
           <FaUserCircle />
         </Link>
       </div>
