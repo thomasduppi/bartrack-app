@@ -27,6 +27,10 @@ interface DraftExerciceForNavigation {
   nombre_reps: number;
   charge_prevue: number;
   rpe_cible: number;
+  seriesValues?: Array<{
+    kg: number;
+    reps: number;
+  }>;
 }
 
 interface ProgrammeCreerNavigationState {
@@ -83,11 +87,15 @@ export function ProgrammeCreerPage() {
         exercicesSelectionnees.forEach((ex) => {
           if (!existingIds.has(ex.id_exercice)) {
             const draft = draftByExerciceId.get(ex.id_exercice);
-            const nombreSeries = Math.max(1, draft?.nombre_series ?? 1);
+            const draftSeriesValues = draft?.seriesValues;
+            const nombreSeries = Math.max(
+              1,
+              draftSeriesValues?.length ?? draft?.nombre_series ?? 1
+            );
             const series = Array.from({ length: nombreSeries }, (_, index) => ({
               id: `${ex.id_exercice}-${index + 1}`,
-              kg: draft?.charge_prevue ?? 0,
-              reps: draft?.nombre_reps ?? 0,
+              kg: draftSeriesValues?.[index]?.kg ?? draft?.charge_prevue ?? 0,
+              reps: draftSeriesValues?.[index]?.reps ?? draft?.nombre_reps ?? 0,
             }));
 
             nouvelleList.push({
@@ -204,17 +212,16 @@ export function ProgrammeCreerPage() {
 
     try {
       setLoading(true);
-      const exercices = exercicesData.map((exData, index) => {
-        const firstSerie = exData.series[0];
-        return {
+      const exercices = exercicesData.flatMap((exData, index) =>
+        exData.series.map((serie) => ({
           id_exercice: exData.exercice.id_exercice,
           ordre_passage: index + 1,
-          nombre_series: exData.series.length,
-          nombre_reps: firstSerie.reps || 0,
-          charge_prevue: firstSerie.kg || 0,
+          nombre_series: 1,
+          nombre_reps: serie.reps || 0,
+          charge_prevue: serie.kg || 0,
           rpe_cible: 8,
-        };
-      });
+        }))
+      );
 
       if (isEditMode && navigationState?.programmeId) {
         await updateProgrammeFull(navigationState.programmeId, {
@@ -431,6 +438,18 @@ export function ProgrammeCreerPage() {
           navigate("/app/add-exercices", {
             state: {
               selectedExercices: exercicesData.map((e) => e.exercice.id_exercice),
+              draftExercices: exercicesData.map((exData, index) => ({
+                id_exercice: exData.exercice.id_exercice,
+                ordre_passage: index + 1,
+                nombre_series: exData.series.length,
+                nombre_reps: exData.series[0]?.reps ?? 0,
+                charge_prevue: exData.series[0]?.kg ?? 0,
+                rpe_cible: 8,
+                seriesValues: exData.series.map((serie) => ({
+                  kg: serie.kg,
+                  reps: serie.reps,
+                })),
+              })),
               draftTitle: titreProgramme,
               draftNote: noteProgramme,
               programmeId: navigationState?.programmeId,

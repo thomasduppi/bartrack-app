@@ -10,6 +10,18 @@ export interface Exercice {
 
 interface AddExercicesNavigationState {
   selectedExercices?: number[];
+  draftExercices?: Array<{
+    id_exercice: number;
+    ordre_passage: number;
+    nombre_series: number;
+    nombre_reps: number;
+    charge_prevue: number;
+    rpe_cible: number;
+    seriesValues?: Array<{
+      kg: number;
+      reps: number;
+    }>;
+  }>;
   draftTitle?: string;
   draftNote?: string;
   programmeId?: number;
@@ -67,6 +79,7 @@ export function AddExercices() {
     navigate("/app/programme/creer", {
       state: {
         selectedExercices,
+        draftExercices: navigationState?.draftExercices ?? [],
         draftTitle: navigationState?.draftTitle ?? "",
         draftNote: navigationState?.draftNote ?? "",
         programmeId: navigationState?.programmeId,

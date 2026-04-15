@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaBolt, FaClipboardList, FaSpinner, FaTimes, FaEllipsisV } from "react-icons/fa";
+import { FaClipboardList, FaSpinner, FaTimes, FaEllipsisV } from "react-icons/fa";
 import { deleteProgrammeFull, getAllProgrammesFull } from "../../API/programmes";
 import { getAllExercices } from "../../API/exercices";
 
@@ -25,6 +25,16 @@ export interface ExerciceForProgramme {
   charge_prevue: number;
   rpe_cible: number;
   id: number;
+}
+
+interface GroupedProgrammeExercice {
+  id_exercice: number;
+  ordre_passage: number;
+  series: Array<{
+    nombre_reps: number;
+    charge_prevue: number;
+    id: number;
+  }>;
 }
 
 export function SeancePage() {
@@ -89,18 +99,53 @@ export function SeancePage() {
     const orderedProgrammeExercices = [...programme.exercices].sort(
       (a, b) => a.ordre_passage - b.ordre_passage
     );
+    const groupedByExercice = orderedProgrammeExercices.reduce<
+      GroupedProgrammeExercice[]
+    >((acc, exercice) => {
+      const existingGroup = acc.find(
+        (group) =>
+          group.id_exercice === exercice.id_exercice &&
+          group.ordre_passage === exercice.ordre_passage
+      );
+
+      if (existingGroup) {
+        existingGroup.series.push({
+          id: exercice.id,
+          nombre_reps: exercice.nombre_reps,
+          charge_prevue: exercice.charge_prevue,
+        });
+        return acc;
+      }
+
+      acc.push({
+        id_exercice: exercice.id_exercice,
+        ordre_passage: exercice.ordre_passage,
+        series: [
+          {
+            id: exercice.id,
+            nombre_reps: exercice.nombre_reps,
+            charge_prevue: exercice.charge_prevue,
+          },
+        ],
+      });
+      return acc;
+    }, []);
 
     navigate("/app/programme/creer", {
       state: {
-        selectedExercices: orderedProgrammeExercices
+        selectedExercices: groupedByExercice
           .map((exercice) => exercice.id_exercice),
-        draftExercices: orderedProgrammeExercices.map((exercice) => ({
+        draftExercices: groupedByExercice.map((exercice) => ({
           id_exercice: exercice.id_exercice,
           ordre_passage: exercice.ordre_passage,
-          nombre_series: exercice.nombre_series,
-          nombre_reps: exercice.nombre_reps,
-          charge_prevue: exercice.charge_prevue,
-          rpe_cible: exercice.rpe_cible,
+          nombre_series: exercice.series.length,
+          nombre_reps: exercice.series[0]?.nombre_reps ?? 0,
+          charge_prevue: exercice.series[0]?.charge_prevue ?? 0,
+          rpe_cible: 8,
+          seriesValues: exercice.series.map((serie) => ({
+            reps: serie.nombre_reps,
+            kg: serie.charge_prevue,
+          })),
         })),
         draftTitle: programme.nom_programme,
         draftNote: programme.description,
@@ -141,6 +186,38 @@ export function SeancePage() {
   const orderedExercices = selectedProgramme
     ? [...selectedProgramme.exercices].sort((a, b) => a.ordre_passage - b.ordre_passage)
     : [];
+  const groupedExercicesForDetails = orderedExercices.reduce<GroupedProgrammeExercice[]>(
+    (acc, exercice) => {
+      const existingGroup = acc.find(
+        (group) =>
+          group.id_exercice === exercice.id_exercice &&
+          group.ordre_passage === exercice.ordre_passage
+      );
+
+      if (existingGroup) {
+        existingGroup.series.push({
+          id: exercice.id,
+          nombre_reps: exercice.nombre_reps,
+          charge_prevue: exercice.charge_prevue,
+        });
+        return acc;
+      }
+
+      acc.push({
+        id_exercice: exercice.id_exercice,
+        ordre_passage: exercice.ordre_passage,
+        series: [
+          {
+            id: exercice.id,
+            nombre_reps: exercice.nombre_reps,
+            charge_prevue: exercice.charge_prevue,
+          },
+        ],
+      });
+      return acc;
+    },
+    []
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0a0a]">
@@ -200,7 +277,21 @@ export function SeancePage() {
                         className="flex-1 text-left"
                       >
                         <h3 className="text-sm font-semibold text-white">{programme.nom_programme}</h3>
-                        <p className="text-xs text-white/50">{programme.exercices?.length || 0} exercices - {new Date(programme.date_creation || "").toLocaleDateString()}</p>
+                        <p className="text-xs text-white/50">
+                          {new Set(
+                            (programme.exercices ?? []).map(
+                              (exercice) => `${exercice.id_exercice}-${exercice.ordre_passage}`
+                            )
+                          ).size} exercice
+                          {new Set(
+                            (programme.exercices ?? []).map(
+                              (exercice) => `${exercice.id_exercice}-${exercice.ordre_passage}`
+                            )
+                          ).size > 1
+                            ? "s"
+                            : ""}{" "}
+                          - {new Date(programme.date_creation || "").toLocaleDateString()}
+                        </p>
                       </button>
 
                       <button
@@ -254,7 +345,7 @@ export function SeancePage() {
 
       {isDetailsOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-10 backdrop-blur-sm"
           onClick={() => setIsDetailsOpen(false)}
         >
           <section
@@ -283,26 +374,33 @@ export function SeancePage() {
                 </p>
 
                 <div className="mt-5 rounded-2xl border border-white/10 bg-black/20">
-                  {orderedExercices.length === 0 ? (
+                  {groupedExercicesForDetails.length === 0 ? (
                     <p className="px-4 py-4 text-sm text-white/50">Aucun exercice dans ce programme.</p>
                   ) : (
-                    orderedExercices.map((exercice) => {
+                    groupedExercicesForDetails.map((exercice) => {
                       const exerciceNom =
                         exerciceNamesById[exercice.id_exercice] ?? `Exercice #${exercice.id_exercice}`;
                       return (
                         <div
-                          key={exercice.id}
-                          className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 last:border-b-0"
+                          key={`${exercice.id_exercice}-${exercice.ordre_passage}`}
+                          className="border-b border-white/10 px-4 py-3 last:border-b-0"
                         >
-                          <div className="min-w-0">
-                            <p className="truncate text-lg font-semibold">
-                              {exercice.nombre_series} x {exerciceNom}
-                            </p>
-                            <p className="text-xs text-white/50">{exercice.nombre_reps} reps</p>
+                          <div className="mb-2 min-w-0">
+                            <p className="truncate text-lg font-semibold">{exerciceNom}</p>
                           </div>
-                          <p className="shrink-0 text-lg font-semibold text-white/75">
-                            {exercice.charge_prevue > 0 ? `${exercice.charge_prevue}kg` : "-"}
-                          </p>
+
+                          <div className="space-y-1">
+                            {exercice.series.map((serie, index) => (
+                              <div
+                                key={serie.id}
+                                className="flex items-center justify-between gap-3 text-sm"
+                              >
+                                <p className="text-white/70">
+                                  Série {index + 1}: {serie.nombre_reps} reps {serie.charge_prevue > 0 ? `- ${serie.charge_prevue}kg` : ""}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       );
                     })
